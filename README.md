@@ -18,11 +18,11 @@ pip install python-evtx
 
 This is your configuration file.
 
-*general* - Enable script running and define file locations.
+**general** - Enable script running and define file locations.
 
-*email* - Enable email notifications, define email accounts and SMTP infomation.
+**email** - Enable email notifications, define email accounts and SMTP infomation.
 
-*authorised devices* - Define a list of authorised USB devices. You wont be notified about these.
+**authorised devices** - Define a list of authorised USB devices. You wont be notified about these.
 
 ## Task Scheduler
 

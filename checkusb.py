@@ -7,11 +7,9 @@ import ctypes, sys # for admin stuff
 import smtplib, ssl # for email
 import configparser # for importing settings
 
-# Fix All getTime things. I'm getting confused with the variables and the function.
-# You will need to go through and change them ALL
-# 
-
 dumpFilename = 'evtxDump.xml'
+configurationFile = 'usb.conf'
+globalTime = datetime.now().strftime("%Y%m%d %H%M%S")
 
 ## Check Admin Rights ##
 
@@ -27,7 +25,6 @@ def is_admin():
 ## Check Run Setting ##
 
 def is_run():
-	print(config)
 	runScript = config.get('general', 'runScript')
 	return runScript
 
@@ -52,7 +49,7 @@ def import_settings():
 	global logDir, evtxLog, dumpDir, config
 	
 	config = configparser.ConfigParser()
-	config.read('usb.conf')
+	config.read(configurationFile)
 	
 	logDir = config.get('general', 'logDir')
 	evtxLog = config.get('general', 'evtxLog')
@@ -61,9 +58,7 @@ def import_settings():
 ## Convert evtx to xml ##
 
 def evtxDumpFunc(evtxPath,xmlPath):
-		
-		# Function to convert an input .evtx file into an xml file
-		
+		# Function to convert an input .evtx file into an xml file #
 		with open(xmlPath,'w') as xmlFile:
 			with evtx.Evtx(evtxPath) as log:
 				xmlFile.write(e_views.XML_HEADER)
@@ -72,14 +67,13 @@ def evtxDumpFunc(evtxPath,xmlPath):
 					xmlFile.write(record.xml())
 					xmlFile.write("</Events>")
 
-
 def convert(directory):
+	# Check if files exist #
 	if os.path.exists(dumpDir) == False:
 		print('\n[-] {} not detected, creating directory...'.format(dumpDir))
-		writeLog(getTime('unique') + ' [!] {} not detected, creating directory...'.format(dumpDir))
 		os.mkdir(dumpDir)
 		print('[+] Done. Commencing...')
-		writeLog(getTime('unique') + ' [+] Done. Commencing...')
+		writeLog(getTime('unique') + ' [+] Created ' + dumpDir + '. Commencing...\n')
 	else:
 		print('\n[+] {} exists. Commencing...'.format(dumpDir))
 		writeLog('{} [+] {} exists. Commencing...\n'.format(getTime('unique'), dumpDir))
@@ -91,10 +85,10 @@ def convert(directory):
 		print('\n[+] {} does not exist. Commencing...'.format(dumpFilename))
 		writeLog(getTime('unique') + ' [+] {} does not exist. Commencing...\n'.format(dumpFilename))
 	
-	print()
+	# Start converting #
 	
-	print('[!] Converting: ' + evtxLog )
-	writeLog('{} [!] Converting to xml: {}'.format(getTime('unique'), evtxLog))
+	print('\n[!] Converting: ' + evtxLog )
+	writeLog('{} [!] Converting to xml: {}\n'.format(getTime('unique'), evtxLog))
 	evtxDumpFunc(logDir+evtxLog,dumpDir+dumpFilename) # Conversion command
 	print('[+] Done: ' + dumpFilename)
 	writeLog('{} [+] Done converting! Output file: {}\n'.format(getTime('unique'), dumpFilename))
@@ -210,7 +204,7 @@ def clear(directory):
 
 def showEvents(events):
 	# Output single instances
-	readableFilename = 'usb_view.log'
+	readableFilename = 'viewUSB.log'
 	
 	writeLog('{} [+] Displaying and writing for all events found. Writing files to: {}\n'.format(getTime('unique'), readableFilename))
 	
@@ -225,7 +219,7 @@ def showEvents(events):
 				if event['Status'] == "USB in" or event['Status'] == "USB out": # Only display in and out instances
 
 					print('\n## EVENT {} ##\n'.format(count))
-					writeLog('{} [+] Found single deduped event: {} '.format(getTime('unique'), count))
+					writeLog('{} [+] Found single deduped event: {} \n'.format(getTime('unique'), count))
 					readableLogFile.write('\n## EVENT {} ##\n\n'.format(count))
 
 					maximumCount = 5 # Maximum fields to display
@@ -270,12 +264,6 @@ def notifyEmail(unauthList):
 	sender_pass = config.get('email', 'password')
 	receiver_id = config.get('email', 'receiver')
 	
-	smtpobj = smtplib.SMTP(config.get('email', 'smtp'), config.get('email', 'port'))
-	
-	smtpobj.starttls()
-	
-	smtpobj.login(sender_id, sender_pass)
-	
 	message = '''
 	From: USB Notify <{}>
 	To: <{}>
@@ -301,16 +289,28 @@ def notifyEmail(unauthList):
 		GuID: {}'''.format(items['Device Name'], items['Time'], items['Event ID'], items['Status'], items['USB Serial Number'], items['Host GuID'], items['Device Make'], items['GuID'])
 		
 		message = message + messageAddition
+	# Exception Handling #
 	try:
+		writeLog(getTime('unique') + ' [+] Preparing email with given credentials...\n')
+		smtpobj = smtplib.SMTP(config.get('email', 'smtp'), config.get('email', 'port'))
+		writeLog(getTime('unique') + ' [+] Start TLS...\n')
+		smtpobj.starttls()
+		writeLog(getTime('unique') + ' [+] Authenticating email account...\n')
+		smtpobj.login(sender_id, sender_pass)
+		writeLog(getTime('unique') + ' [+] Sending email...\n')
 		smtpobj.sendmail(sender_id,receiver_id, message)
 		smtpobj.quit()
-		print('[+] Email Sent.')
-		writeLog(logTime('unique') + ' [+] Email sent to: ' + sender_id)
+		
 	except:
-		print('Error sending email. Check configuration and internet connection.')
-		writeLog(getTime('unique') + ' [!] Error sending email. Check configuration and internet connection.')
-		logError('Error sending email. Check configuration and internet connection.')
-
+		print('\n[!] And error occured, please check', configurationFile)
+		writeLog(getTime('unique') + ' [!] Error sending email. Check most recent log message to understand why. Nothing was sent.\n')
+		logError('[!] Error sending email. Nothing was sent. Check specific log for more information')
+		smtpobj.quit()
+		quit()
+	
+	print('[+] Email Sent!')
+	writeLog(getTime('unique') + ' [+] Email sent to: ' + sender_id)
+	
 ## Create Log ##
 
 def writeLog(logMessage):
@@ -331,7 +331,7 @@ def logError(errorMessage):
 
 def getTime(format):
 	if format == 'global': # Format for filenames
-		currentTime = datetime.now().strftime("%Y%m%d %H%M%S")
+		currentTime = globalTime
 	elif format == 'unique': # Format for inside logs
 		currentTime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 	return currentTime
@@ -351,7 +351,7 @@ def main():
 	
 	
 	if unauthList and is_notify():
-		notifyEmail(logTime, unauthList)
+		notifyEmail(unauthList)
 
 
 if __name__ == "__main__":
@@ -360,7 +360,7 @@ if __name__ == "__main__":
 		if is_run(): # If script is enabled in config
 			main()
 		else:
-			logError('running script is disabled in usb.conf')
+			logError('running script is disabled in ' + configurationFile)
 	else:
 		logError('error starting script as Admin')
 		

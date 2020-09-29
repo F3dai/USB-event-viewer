@@ -107,36 +107,46 @@ def sanitise(xml):
 	
 	# open files for reading and writing:
 	with open(dumpDir + xml, 'r') as inputXmlFile: #, open(dumpDir + 'usb_raw.log', 'w+') as rawOutputFile: 
+			
+			deviceName = computerName = eventType = deviceMake = eventType = hostGuid = guid = timeCreated = eventID = userData = "Null" 
 			for line in inputXmlFile: # Scan through lines of log file
+			
+				# Set all variables to null in case it doesn't exist in event #
+			
+				
+				
 				if '<Event xmlns=' in line: # Identify start of event
+					
 					try:
 						guid = re.search('Guid="(.+?)"></Provider>', line)
 						guid = guid.group(1)
 					except:
-						writeLog(getTime('unique') + ' [-] GUID ERROR: ' + line) # suk ya mum
-						logError('GUID ERROR: ' + line)
+						writeLog('\n{} [-] GUID regex error: {}'.format(getTime('unique'), line)) # suk ya mum
+						logError('[-] GUID regex error: ' + line)
 						
 				elif 'TimeCreated' in line:
+					
 					try:
 						timeCreated = re.search('<TimeCreated SystemTime="(.+?)"></TimeCreated>',line)
 						timeCreated = timeCreated.group(1)
 					except:
-						writeLog(getTime('unique') + ' [-] USER DATA ERROR:' + line) # suk ya mum
-						logError('USER DATA ERROR:' + line)
+						writeLog('\n{} [-] Time regex error : {}'.format(getTime('unique'), line)) # suk ya mum
+						logError('[-] Time regex error:' + line)
 				
 				elif '<EventID Qualifiers="">' in line:
 					
-
 					eventID = re.search('Qualifiers=\"\">(.+)</EventID>', line)
 					eventID = eventID.group(1)
 
-					eventType = 'Null' # Default
-
+					
+					
 					if eventID == '1003': # the Driver Manager service is starting a host process
 						eventType = 'USB in'
 						
 					if eventID == '1006':
 						eventType = 'USB out'
+					
+					else: eventType == 'Other'
 								   
 				elif '<UserData>' in line:
 					try:
@@ -144,35 +154,53 @@ def sanitise(xml):
 						userData = userData.group(1)
 
 					except:
-						writeLog(getTime('unique') + ' [-] USER DATA ERROR:' + line) # suk ya mum
-						logError('USER DATA ERROR:' + line)
+						writeLog('\n{} [-] UserData regex error: {}'.format(getTime('unique'), line)) # suk ya mum
+						logError('[-] UserData regex error:' + line)
 						
 				elif 'HostGuid' in line:
 					try:
 						hostGuid = re.search('<HostGuid>(.+?)</HostGuid>',line)
 						hostGuid = hostGuid.group(1)
 					except:
-						writeLog(getTime('unique') + ' [-] HOST GUID ERROR:' + line) # suk ya mum
-						logError('HOST GUID ERROR:' + line)
+						writeLog('\n{} [-] Host GUID regex error: {}'.format(getTime('unique'), line)) # suk ya mum
+						logError('[-] Host GUID regex error' + line)
 						
-				elif '<DeviceInstanceId>' in line:
+				elif 'InstanceId' in line:
+					
 					try:
+						
 						deviceMake = re.search('{(.+?)}',line)
 						deviceMake = '{' + deviceMake.group(1) + '}'
+					except:
+						writeLog('\n{} [-] Device Make regex error: {}'.format(getTime('unique'), line)) # suk ya mum						
+						logError('[-] Device Make regex error' + line)
+						
+					try:
 						deviceName = re.search('#DISK&amp;(.+?)&amp;', line)
 						deviceName = deviceName.group(1)
 					except:
-						writeLog(getTime('unique') + ' [-] DEVICE MAKE ERROR:' + line)
-						deviceName = "Null" # If there isn't device name in event?
-						logError('DEVICE MAKE ERROR:' + line)
-				
-				
+						writeLog('\n{} [-] Device Name regex error: {}'.format(getTime('unique'), line)) # suk ya mum						
+						logError('[-] Device Name regex error' + line)
+						
+						
+				elif '<Computer>' in line:
+					
+					try:
+						computerName = re.search('<Computer>(.+?)<\/Computer>')
+						computerName = computerName.group(1)
+					except:
+						writeLog('\n{} [-] Computer Name regex error: {}'.format(getTime('unique'), line)) # suk ya mum
+						logError('[-] Computer Name regex error:' + line)
+						
+						
 				elif '</Event>' in line:
+					
 					
 					# Save as much data as possible
 					tmpDict = {
 						"Device Name" : deviceName,
 						"Time" : timeCreated, 
+						"Computer Name" : computerName,
 						"Event ID" : eventID,
 						"Status" : eventType,
 						"USB Serial Number" : userData, 
@@ -181,14 +209,13 @@ def sanitise(xml):
 						"GuID" : guid, 
 						
 						 }
-					#rawOutputFile.write(("Device Name: {}\nTime: {}\nEvent ID: {}\nStatus: {}\nUSB Serial Number: {}\nHost GuID: {}\nMake: {}\nGuID: {}\n\n").format(guid, timeCreated, userData, hostGuid, deviceMake, deviceName, eventID, eventType))
 					
-					writeLog(getTime('unique') + " [+] Found Event:\n Device Name: {}\n Time: {}\n Event ID: {}\n Status: {}\n USB  Serial Number: {}\n Host GuID: {}\n Make: {}\n GuID: {}\n".format(guid, timeCreated, userData, hostGuid, deviceMake, deviceName, eventID, eventType))
+					writeLog(getTime('unique') + " [+] Found Event:\n Device Name: {}\n Time: {}\n Win Event ID: {}\n Status: {}\n USB  Serial Number: {}\n Host GuID: {}\n Device Make: {}\n GuID: {}\n Computer Name: {}\n".format(deviceName, timeCreated, eventID, eventType, userData, hostGuid, deviceMake, guid, computerName))
 
 					USBinstances.append(tmpDict)
 	
 	print("[+] Done! Saved to:", logDir + xml)
-	writeLog('{} [+] Done! Saved to: {}{}\n'.format(getTime('unique'), logDir, xml))
+	writeLog('\n{} [+] Done! Saved to: {}{}\n'.format(getTime('unique'), logDir, xml))
 	return USBinstances
 
 ## Remove xml files ##
@@ -352,7 +379,8 @@ def main():
 	
 	if unauthList and is_notify():
 		notifyEmail(unauthList)
-
+	
+	writeLog('\n{} [+] All done. Stopping script...'.format(getTime('unique')))
 
 if __name__ == "__main__":
 	import_settings()
@@ -360,7 +388,7 @@ if __name__ == "__main__":
 		if is_run(): # If script is enabled in config
 			main()
 		else:
-			logError('running script is disabled in ' + configurationFile)
+			logError('[!] Running script is disabled in ' + configurationFile)
 	else:
-		logError('error starting script as Admin')
+		logError('[!] Error starting script as Admin')
 		
